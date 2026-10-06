@@ -11,4 +11,6 @@ export interface Chat {
   title: string
   messages: Message[]
   unread: number
+  /** другие chatId того же собеседника (номер телефона ↔ числовой ID) */
+  aliases?: string[]
 }
