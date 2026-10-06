@@ -74,8 +74,10 @@ export function toChatId(input: string): string {
 }
 
 export function chatTitle(chatId: string): string {
-  const [id] = chatId.split('@')
-  return /^\d{10,15}$/.test(id) ? `+${id}` : id
+  const [id, suffix] = chatId.split('@')
+  if (suffix === 'c.us') return `+${id}`
+  if (id.startsWith('-')) return `Группа ${id}`
+  return `ID ${id}`
 }
 
 /** Достаёт текст из уведомления, если это текстовое сообщение. */
