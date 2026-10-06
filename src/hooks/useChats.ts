@@ -38,10 +38,29 @@ export function useChats(credentials: Credentials) {
     }
   }, [chats, credentials.idInstance])
 
-  /** Добавляет сообщение в чат (создавая чат при необходимости), без дублей по id. */
-  const addMessage = useCallback((chatId: string, message: Message) => {
+  /**
+   * Добавляет сообщение в чат (создавая чат при необходимости), без дублей по id.
+   * Чат ищется по chatId или по его псевдонимам: например, чат создан по номеру
+   * телефона (79991234567@c.us), а уведомления приходят с числовым ID (Telegram, MAX).
+   */
+  const addMessage = useCallback((rawChatId: string, message: Message) => {
     setChats((prev) => {
-      const existing = prev.find((c) => c.chatId === chatId)
+      let existing = prev.find((c) => c.chatId === rawChatId || c.aliases?.includes(rawChatId))
+
+      if (!existing && message.outgoing) {
+        // уведомление о нашем же сообщении пришло под другим chatId — запоминаем псевдоним
+        const owner = prev.find((c) =>
+          c.messages.some(
+            (m) => m.id === message.id || (m.status === 'sending' && m.text === message.text),
+          ),
+        )
+        if (owner) {
+          return prev.map((c) =>
+            c === owner ? { ...c, aliases: [...(c.aliases ?? []), rawChatId] } : c,
+          )
+        }
+      }
+
       if (existing?.messages.some((m) => m.id === message.id)) return prev
       // уведомление об отправленном через API сообщении может прийти раньше ответа sendMessage
       if (
@@ -51,8 +70,9 @@ export function useChats(credentials: Credentials) {
       ) {
         return prev
       }
+      const chatId = existing?.chatId ?? rawChatId
       const isActive = activeRef.current === chatId
-      const updated: Chat = existing
+      existing = existing
         ? {
             ...existing,
             messages: [...existing.messages, message],
@@ -65,7 +85,7 @@ export function useChats(credentials: Credentials) {
             unread: message.outgoing || isActive ? 0 : 1,
           }
       // поднимаем чат с новым сообщением наверх списка
-      return [updated, ...prev.filter((c) => c.chatId !== chatId)]
+      return [existing, ...prev.filter((c) => c.chatId !== chatId)]
     })
   }, [])
 
